@@ -1,0 +1,100 @@
+---
+title: "Practical Machine Learning - Prediction Assignment"
+output: html_document
+geometry: margin=2cm
+---
+
+#Overview
+
+Accelerometers were attached to the belt, forearm, arm and dumbell of 6 participants to determine whether they were performing barbell lifts correctly.
+
+This data can be found here: http://groupware.les.inf.puc-rio.br/har.
+
+On the website above the authors of the project state: "Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).
+Class A corresponds to the specified execution of the exercise, while the other 4 classes correspond to common mistakes."
+
+In our study, discussed in this paper, we will use the data obtained above to build a machine learning model that can predict the class of exercise from the accelerometer data.
+
+#Data
+
+The training and test data for this project are available from the following links:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+In this paper we will assume these files have been loaded into the user's working directory.
+
+##Load Data 
+
+```{r,cache=TRUE}
+rm(list=ls())
+training <- read.csv("pml-training.csv")
+testing <- read.csv("pml-testing.csv")
+```
+
+#Pre-processing of Data
+
+There are initially 160 columns in the test and training set. The training set contains nearly 20,000 rows, whilst the testing set contains only 20 rows. Using the r command str(testing) we can see that there are many columns with NA's. We remove these columns from both datasets. We also remove the first 7 columns containing the variables: X, user_name,	raw_timestamp_part_1,	raw_timestamp_part_2,	cvtd_timestamp,	new_window,	and num_window as these tags do not pertain to the accelerometer readings. We also remove last column of test data ('problem_id').
+
+
+```{r}
+col_index=!colSums(is.na(testing))==20
+col_index[1:7]=FALSE
+
+testing<-testing[,col_index]
+training<-training[,col_index]
+
+testing<-testing[,-ncol(testing)]
+```
+
+#Splitting data into Training and Test sets.
+
+We now split the original training dataset into two parts. We use 80% of the original training data to train our model and the remaining 20% we keep to test our model.
+
+```{r,message=FALSE}
+library(caret)
+set.seed(999)
+inTrain = createDataPartition(training$classe, p = .8)[[1]]
+mytraining = training[ inTrain,]
+mytesting = training[-inTrain,]
+```
+
+#Fit a Random Forest ML using 5-fold cross validation
+
+We now train a Random Forest model using the mytraining dataset using 5-fold cross validation. 5-fold cross validation means the mytraining dataset is split into 5 parts. Then 4 of the 5 subsets are used to train the model with the remaining subset used to test the model. This is repeated for each possible combination of subsets. Then the data is aggregated to estimate errors.
+
+```{r,message=FALSE}
+modFit <- train(classe ~.,method="rf", trControl=trainControl(method = "cv", number = 5),data=mytraining)
+```
+
+#Testing out-of-sample error
+
+The out-of-sample error is the error rate you get using a new dataset. We use the mytesting dataset to test the accuracy of the model. The accuracy is simply the number of correct predictions over the total number of predictions. We can also display this in table form. 
+
+```{r,message=TRUE}
+pred <- predict(modFit, mytesting)
+confMat<-confusionMatrix(pred, mytesting$classe)
+confMat$overall[1]
+confMat$table
+```
+
+We see our model has an accuracy of `r confMat$overall[1] `
+
+
+#Prediction Quiz results
+
+We now use our trained model to predict the class of each of the 20 samples in the testing set
+
+```{r}
+print(predict(modFit, testing))
+```
+
+
+#Conclusion
+
+We see that it is possible to build a machine learning model to predict the class of exercise from accelerometer data with very high accuracy.
+
+
+
+
